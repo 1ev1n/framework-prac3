@@ -3,7 +3,7 @@ program LegacyCSV;
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils, DateUtils, Process;
+  SysUtils, DateUtils, Unix;
 
 function GetEnvDef(const name, def: string): string;
 var v: string;
@@ -17,25 +17,70 @@ begin
   Result := minV + Random * (maxV - minV);
 end;
 
+function RandBool(): Boolean;
+begin
+  Result := Random(2) = 1;
+end;
+
+function FormatTimestamp(ts: TDateTime): string;
+begin
+  Result := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss"Z"', ts);
+end;
+
+function FormatBoolean(b: Boolean): string;
+begin
+  if b then Result := 'ИСТИНА' else Result := 'ЛОЖЬ';
+end;
+
+function FormatNumber(n: Double): string;
+begin
+  Result := FormatFloat('0.00', n);
+end;
+
 procedure GenerateAndCopy();
 var
   outDir, fn, fullpath, pghost, pgport, pguser, pgpass, pgdb, copyCmd: string;
   f: TextFile;
-  ts: string;
+  ts: TDateTime;
+  voltage, temp: Double;
+  isActive: Boolean;
+  recordId: Integer;
 begin
   outDir := GetEnvDef('CSV_OUT_DIR', '/data/csv');
-  ts := FormatDateTime('yyyymmdd_hhnnss', Now);
-  fn := 'telemetry_' + ts + '.csv';
+  ts := Now;
+  fn := 'telemetry_' + FormatDateTime('yyyymmdd_hhnnss', ts) + '.csv';
   fullpath := IncludeTrailingPathDelimiter(outDir) + fn;
 
-  // write CSV
+  // write CSV with proper formatting
   AssignFile(f, fullpath);
   Rewrite(f);
-  Writeln(f, 'recorded_at,voltage,temp,source_file');
-  Writeln(f, FormatDateTime('yyyy-mm-dd hh:nn:ss', Now) + ',' +
-             FormatFloat('0.00', RandFloat(3.2, 12.6)) + ',' +
-             FormatFloat('0.00', RandFloat(-50.0, 80.0)) + ',' +
-             fn);
+  
+  // Header
+  Writeln(f, 'recorded_at,voltage,temp,is_active,record_id,source_file');
+  
+  // Generate multiple records for demonstration
+  for recordId := 1 to 10 do
+  begin
+    ts := IncSecond(Now, -recordId * 60); // Different timestamps
+    voltage := RandFloat(3.2, 12.6);
+    temp := RandFloat(-50.0, 80.0);
+    isActive := RandBool();
+    
+    // Write with proper formatting:
+    // - Timestamp: ISO 8601 format
+    // - Numbers: numeric format (no quotes)
+    // - Boolean: ИСТИНА/ЛОЖЬ
+    // - Strings: text format
+    Writeln(f, 
+      FormatTimestamp(ts) + ',' +
+      FormatNumber(voltage) + ',' +
+      FormatNumber(temp) + ',' +
+      FormatBoolean(isActive) + ',' +
+      IntToStr(recordId) + ',' +
+      '"' + fn + '"'
+    );
+  end;
+  
   CloseFile(f);
 
   // COPY into Postgres
@@ -45,13 +90,10 @@ begin
   pgpass := GetEnvDef('PGPASSWORD', 'monopass');
   pgdb   := GetEnvDef('PGDATABASE', 'monolith');
 
-  // Use psql with COPY FROM PROGRAM for simplicity
-  // Here we call psql reading from file
-  copyCmd := 'psql "host=' + pghost + ' port=' + pgport + ' user=' + pguser + ' dbname=' + pgdb + '" ' +
-             '-c "\copy telemetry_legacy(recorded_at, voltage, temp, source_file) FROM ''' + fullpath + ''' WITH (FORMAT csv, HEADER true)"';
-  // Mask password via env
-  SetEnvironmentVariable('PGPASSWORD', pgpass);
-  // Execute
+  // Используем ExecProcess для выполнения psql
+  copyCmd := 'PGPASSWORD=' + pgpass + ' psql "host=' + pghost + ' port=' + pgport + ' user=' + pguser + ' dbname=' + pgdb + '" ' +
+             '-c "\copy telemetry_legacy(recorded_at, voltage, temp, is_active, record_id, source_file) FROM ''' + fullpath + ''' WITH (FORMAT csv, HEADER true)"';
+  
   fpSystem(copyCmd);
 end;
 
