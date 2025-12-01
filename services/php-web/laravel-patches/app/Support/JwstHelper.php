@@ -28,13 +28,26 @@ final class JwstHelper
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_FOLLOWLOCATION => true,
         ]);
         $raw = curl_exec($ch);
+        $err = curl_error($ch);
+        $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
 
+        if ($raw === false || !empty($err)) {
+            return ['error' => 'CURL error: ' . $err];
+        }
+
+        if ($code >= 400) {
+            return ['error' => 'HTTP error: ' . $code, 'body' => $raw];
+        }
+
         $j = json_decode((string)$raw, true);
-        return is_array($j) ? $j : [];
+        return is_array($j) ? $j : ['error' => 'Invalid JSON response', 'raw' => substr($raw, 0, 200)];
     }
 
     /** ищем первую пригодную картинку в произвольной структуре */
