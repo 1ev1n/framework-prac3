@@ -19,6 +19,15 @@ if [ -d "$PATCH_DIR" ]; then
   rsync -a "$PATCH_DIR/" "$APP_DIR/"
 fi
 
+# Установка зависимостей через composer
+if [ -f "$APP_DIR/composer.json" ]; then
+  echo "[php] installing composer dependencies"
+  cd "$APP_DIR"
+  composer install --no-interaction --prefer-dist --optimize-autoloader || true
+  composer require phpoffice/phpspreadsheet --no-interaction --ignore-platform-req=ext-gd --ignore-platform-req=ext-zip || \
+  composer require phpoffice/phpspreadsheet --no-interaction || true
+fi
+
 chown -R www-data:www-data "$APP_DIR"
 chmod -R 775 "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" || true
 
