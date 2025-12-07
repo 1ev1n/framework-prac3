@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends     fp-compiler
 WORKDIR /opt/legacy
 COPY legacy.pas ./
 COPY run.sh /usr/local/bin/run_legacy.sh
-RUN chmod +x /usr/local/bin/run_legacy.sh
+RUN sed -i 's/\r$//' /usr/local/bin/run_legacy.sh && \
+    chmod +x /usr/local/bin/run_legacy.sh
 
 CMD ["/usr/local/bin/run_legacy.sh"]
