@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Response;
+use App\Http\Validation\IssRequestValidator;
+use App\Http\Middleware\RateLimitMiddleware;
 
 class ProxyController extends Controller
 {
@@ -13,6 +15,7 @@ class ProxyController extends Controller
     public function last()  { return $this->pipe('/last'); }
 
     public function trend() {
+        IssRequestValidator::validateTrendRequest(request());
         $q = request()->getQueryString();
         return $this->pipe('/iss/trend' . ($q ? '?' . $q : ''));
     }

@@ -3,11 +3,18 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Validation\AstroRequestValidator;
 
 class AstroController extends Controller
 {
+    public function index()
+    {
+        return view('astro.index');
+    }
+
     public function events(Request $r)
     {
+        AstroRequestValidator::validateEventsRequest($r);
         $lat  = (float) $r->query('lat', 55.7558);
         $lon  = (float) $r->query('lon', 37.6176);
         $days = max(1, min(30, (int) $r->query('days', 7)));
